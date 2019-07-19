@@ -1,11 +1,13 @@
+import java.util.*;
+import java.util.concurrent.atomic.*;
 public class TicketRooms implements Rooms {
-  int numRooms; // how many rooms
-  AtomicInteger activeRoom; // index of active room or NONE
-  AtomicIntegerArray wait; // how many enter requests
-  AtomicIntegerArray grant; // how many enter grants
-  AtomicIntegerArray done; // how many exits
-  Rooms.Handler[] handler; // per−room exit handler
-  private static final int NONE = -1; // no room is free
+  int numRooms;
+  AtomicInteger activeRoom;
+  AtomicIntegerArray wait;
+  AtomicIntegerArray grant;
+  AtomicIntegerArray done;
+  Rooms.Handler[] handler;
+  private static final int NONE = -1;
   public TicketRooms(int m) {
     numRooms = m;
     wait = new AtomicIntegerArray(m);
@@ -15,37 +17,36 @@ public class TicketRooms implements Rooms {
     activeRoom = new AtomicInteger(NONE);
   }
   public void enter(int i) {
-    int myTicket = wait.getAndIncrement(i) + 1; // get ticket
-    while (myTicket > grant.get(i)) { // spin until granted
-      if (activeRoom.get() == NONE) { // if no active room
-        if (activeRoom.compareAndSet(NONE,i)) { // make my room active
+    int myTicket = wait.getAndIncrement(i) + 1;
+    while (myTicket > grant.get(i)) {
+      if (activeRoom.get() == NONE) {
+        if (activeRoom.compareAndSet(NONE,i)) {
           grant.set(i, wait.get(i));
-          //let all with tickets enter
           return;
         }
       }
     }
   }
   public boolean exit() {
-    int room = activeRoom.get(); // preparing to exit
-    int myDone = done.getAndIncrement(room) + 1; // increment done counter
-    if (myDone == grant.get(room)) { // Am I last?
-      if (handler[room] != null) // if handler defined ,
-        handler[room].onEmpty(); // call it
+    int room = activeRoom.get();
+    int myDone = done.getAndIncrement(room) + 1;
+    if (myDone == grant.get(room)) {
+      if (handler[room] != null)
+        handler[room].onEmpty();
       for (int k=0; k < numRooms; k++) {
-        room = (room + 1) % numRooms; // round robin through rooms
-        if (wait.get(room) > grant.get(room)) { // someone waiting?
-          activeRoom.set(room); // make this room active
-          grant. set(room, wait.get(room)); // admit threads with tickets
-          return true; // I am last to leave
+        room = (room + 1) % numRooms;
+        if (wait.get(room) > grant.get(room)) {
+          activeRoom.set(room);
+          grant. set(room, wait.get(room));
+          return true;
         }
       }
-      activeRoom.set(NONE); // no waiters, no active reoom
-      return true; // I am last to leave
+      activeRoom.set(NONE);
+      return true;
     }
-    return false ; // I am not last to leave
+    return false;
   }
-  public void setExitHandler(int i , Rooms.Handler h) {
-    handler[ i ] = h;
+  public void setExitHandler(int i, Rooms.Handler h) {
+    handler[i] = h;
   }
 }
